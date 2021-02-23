@@ -53,6 +53,8 @@
 									<listOptionValue builtIn="false" value="../User/GUI"/>
 									<listOptionValue builtIn="false" value="../User"/>
 									<listOptionValue builtIn="false" value="../User/pngle"/>
+									<listOptionValue builtIn="false" value="../User/https_client"/>
+									<listOptionValue builtIn="false" value="../User/https_client/mbedtls/include"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.1405063467" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
 							</tool>

@@ -71,6 +71,10 @@ void led_set(uint8_t led, uint8_t state);
 #define WCS_GPIO_Port GPIOB
 #define WCMD_Pin GPIO_PIN_14
 #define WCMD_GPIO_Port GPIOB
+#define ESPRST_Pin GPIO_PIN_8
+#define ESPRST_GPIO_Port GPIOA
+#define ESPBOOT_Pin GPIO_PIN_11
+#define ESPBOOT_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

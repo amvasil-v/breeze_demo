@@ -27,6 +27,7 @@
 
 #include "display.h"
 #include "qspi_driver.h"
+#include "esp_uart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,11 +50,13 @@
 
 /* Private variables ---------------------------------------------------------*/
 QSPI_HandleTypeDef hqspi;
-DMA_HandleTypeDef hdma_quadspi;
 
 SPI_HandleTypeDef hspi2;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart6;
+DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart6_tx;
 
 /* USER CODE BEGIN PV */
@@ -67,6 +70,7 @@ static void MX_DMA_Init(void);
 static void MX_USART6_UART_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_QUADSPI_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void qspi_test(void);
 /* USER CODE END PFP */
@@ -119,8 +123,6 @@ int _write (int file, char *data, int len)
 
 
 }
-
-
 /* USER CODE END 0 */
 
 /**
@@ -155,6 +157,7 @@ int main(void)
 	MX_USART6_UART_Init();
 	MX_SPI2_Init();
 	MX_QUADSPI_Init();
+	MX_USART1_UART_Init();
 	/* USER CODE BEGIN 2 */
 
 	/* USER CODE END 2 */
@@ -173,6 +176,16 @@ int main(void)
 	}
 
 	const size_t qspi_addr = 0;
+
+	esp_bridge_t *esp = esp_bridge_create();
+	HAL_Delay(200);
+
+	if (esp_command_ate0(esp)) {
+		printf("ESP: Failed to set ATE0\r\n");
+		Error_Handler();
+	} else {
+		printf("ESP: set ATE0\r\n");
+	}
 
 	//#define PROGRAM_IMAGE_QSPI
 #ifdef PROGRAM_IMAGE_QSPI
@@ -199,6 +212,7 @@ int main(void)
 	printf("Written PNG image to QSPI flash\r\n");
 #endif
 
+#ifdef DISPLAY_IMAGE
 	led_set(1, 1);
 	load_png_image_init();
 	size_t bytes_fed = 0;
@@ -224,6 +238,7 @@ int main(void)
 	display_png_image();
 	HAL_Delay(100);
 	display_deinit();
+#endif
 
 	while (1)
 	{
@@ -361,6 +376,39 @@ static void MX_SPI2_Init(void)
 }
 
 /**
+ * @brief USART1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USART1_UART_Init(void)
+{
+
+	/* USER CODE BEGIN USART1_Init 0 */
+
+	/* USER CODE END USART1_Init 0 */
+
+	/* USER CODE BEGIN USART1_Init 1 */
+
+	/* USER CODE END USART1_Init 1 */
+	huart1.Instance = USART1;
+	huart1.Init.BaudRate = 115200;
+	huart1.Init.WordLength = UART_WORDLENGTH_8B;
+	huart1.Init.StopBits = UART_STOPBITS_1;
+	huart1.Init.Parity = UART_PARITY_NONE;
+	huart1.Init.Mode = UART_MODE_TX_RX;
+	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+	if (HAL_UART_Init(&huart1) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN USART1_Init 2 */
+
+	/* USER CODE END USART1_Init 2 */
+
+}
+
+/**
  * @brief USART6 Initialization Function
  * @param None
  * @retval None
@@ -403,6 +451,9 @@ static void MX_DMA_Init(void)
 	__HAL_RCC_DMA2_CLK_ENABLE();
 
 	/* DMA interrupt init */
+	/* DMA2_Stream2_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
 	/* DMA2_Stream6_IRQn interrupt configuration */
 	HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
@@ -431,10 +482,16 @@ static void MX_GPIO_Init(void)
 	HAL_GPIO_WritePin(WRST_GPIO_Port, WRST_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, GPIO_PIN_SET);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB, LED1_Pin|WCS_Pin|WCMD_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOB, WCS_Pin|WCMD_Pin, GPIO_PIN_RESET);
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOA, ESPRST_Pin|ESPBOOT_Pin, GPIO_PIN_SET);
 
 	/*Configure GPIO pin : WRST_Pin */
 	GPIO_InitStruct.Pin = WRST_Pin;
@@ -462,6 +519,13 @@ static void MX_GPIO_Init(void)
 	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(WBUSY_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pins : ESPRST_Pin ESPBOOT_Pin */
+	GPIO_InitStruct.Pin = ESPRST_Pin|ESPBOOT_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
