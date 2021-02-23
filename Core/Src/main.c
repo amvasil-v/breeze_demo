@@ -26,6 +26,7 @@
 #include <stdio.h>
 
 #include "display.h"
+#include "qspi_driver.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +48,9 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+QSPI_HandleTypeDef hqspi;
+DMA_HandleTypeDef hdma_quadspi;
+
 SPI_HandleTypeDef hspi2;
 
 UART_HandleTypeDef huart6;
@@ -62,6 +66,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART6_UART_Init(void);
 static void MX_SPI2_Init(void);
+static void MX_QUADSPI_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -149,17 +154,68 @@ int main(void)
 	MX_DMA_Init();
 	MX_USART6_UART_Init();
 	MX_SPI2_Init();
+	MX_QUADSPI_Init();
 	/* USER CODE BEGIN 2 */
-	uint32_t led1_cnt = 0;
 
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	HAL_Delay(100);
+	HAL_Delay(400);
 	printf("App started\r\n");
 	HAL_Delay(100);
 
+	const size_t pattern_size = 150000;
+	const size_t flash_addr = 0x0;
+	led_set(0, 0);
+	led_set(1, 0);
+
+	if (QSPI_init_device()) {
+		printf("Failed to init QSPI flash\r\n");
+		Error_Handler();
+	}
+	if (QSPI_area_erase(flash_addr, pattern_size)) {
+		printf("Failed to erase QSPI flash\r\n");
+		Error_Handler();
+	}
+	HAL_Delay(100);
+	if (QSPI_write_pattern(flash_addr, pattern_size)) {
+		printf("Failed to write pattern\r\n");
+		Error_Handler();
+	}
+	HAL_Delay(100);
+	led_set(1, 1);
+	if (QSPI_verify_pattern(flash_addr, pattern_size)) {
+		printf("Failed to verify pattern\r\n");
+		Error_Handler();
+	}
+	led_set(0, 0);
+
+	/*HAL_Delay(1000);
+	if (QSPI_sector_erase(flash_addr)) {
+		printf("Failed to erase QSPI flash\r\n");
+		Error_Handler();
+	}
+	HAL_Delay(100);
+
+	uint8_t buf[10];
+	if (QSPI_read_page(buf, 10, flash_addr)) {
+		printf("Failed to read buf\r\n");
+		Error_Handler();
+	}
+	printf("read buf:\r\n");
+
+	for (int i = 0; i < 10; i++) {
+		printf("0x%02x \n", buf[i]);
+	}
+	printf("\r\n");*/
+
+	/*if (QSPI_test()) {
+		Error_Handler();
+	}*/
+
+//#define SKIP_DISPLAY
+#ifndef SKIP_DISPLAY
 	if(load_png_image((uint8_t *)PNG_IMAGE_ADDRESS, PNG_IMAGE_SIZE)) {
 		Error_Handler();
 	}
@@ -170,6 +226,7 @@ int main(void)
 	display_clear();*/
 	HAL_Delay(100);
 	display_deinit();
+#endif
 
 	while (1)
 	{
@@ -177,12 +234,6 @@ int main(void)
 
 		/* USER CODE BEGIN 3 */
 		HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		if (led1_cnt++ % 5 == 1) {
-			HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, LED_GPIO_ON);
-			printf("Working\r\n");
-		} else {
-			HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, LED_GPIO_OFF);
-		}
 		HAL_Delay(400);
 
 	}
@@ -237,6 +288,41 @@ void SystemClock_Config(void)
 	{
 		Error_Handler();
 	}
+}
+
+/**
+ * @brief QUADSPI Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_QUADSPI_Init(void)
+{
+
+	/* USER CODE BEGIN QUADSPI_Init 0 */
+
+	/* USER CODE END QUADSPI_Init 0 */
+
+	/* USER CODE BEGIN QUADSPI_Init 1 */
+
+	/* USER CODE END QUADSPI_Init 1 */
+	/* QUADSPI parameter configuration*/
+	hqspi.Instance = QUADSPI;
+	hqspi.Init.ClockPrescaler = 127;
+	hqspi.Init.FifoThreshold = 1;
+	hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_NONE;
+	hqspi.Init.FlashSize = 21;
+	hqspi.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_1_CYCLE;
+	hqspi.Init.ClockMode = QSPI_CLOCK_MODE_0;
+	hqspi.Init.FlashID = QSPI_FLASH_ID_1;
+	hqspi.Init.DualFlash = QSPI_DUALFLASH_DISABLE;
+	if (HAL_QSPI_Init(&hqspi) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN QUADSPI_Init 2 */
+
+	/* USER CODE END QUADSPI_Init 2 */
+
 }
 
 /**
@@ -323,6 +409,9 @@ static void MX_DMA_Init(void)
 	/* DMA2_Stream6_IRQn interrupt configuration */
 	HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
+	/* DMA2_Stream7_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 
@@ -338,14 +427,24 @@ static void MX_GPIO_Init(void)
 	/* GPIO Ports Clock Enable */
 	__HAL_RCC_GPIOC_CLK_ENABLE();
 	__HAL_RCC_GPIOH_CLK_ENABLE();
-	__HAL_RCC_GPIOB_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(WRST_GPIO_Port, WRST_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB, LED1_Pin|WRST_Pin|WCS_Pin|WCMD_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, LED1_Pin|WCS_Pin|WCMD_Pin, GPIO_PIN_RESET);
+
+	/*Configure GPIO pin : WRST_Pin */
+	GPIO_InitStruct.Pin = WRST_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(WRST_GPIO_Port, &GPIO_InitStruct);
 
 	/*Configure GPIO pin : LED0_Pin */
 	GPIO_InitStruct.Pin = LED0_Pin;
@@ -354,8 +453,8 @@ static void MX_GPIO_Init(void)
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(LED0_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : LED1_Pin WRST_Pin WCS_Pin WCMD_Pin */
-	GPIO_InitStruct.Pin = LED1_Pin|WRST_Pin|WCS_Pin|WCMD_Pin;
+	/*Configure GPIO pins : LED1_Pin WCS_Pin WCMD_Pin */
+	GPIO_InitStruct.Pin = LED1_Pin|WCS_Pin|WCMD_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -370,7 +469,24 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void led_blink(uint8_t led)
+{
+	if (led == 0) {
+		HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+	} else if (led == 1) {
+		HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+	}
+}
 
+void led_set(uint8_t led, uint8_t state)
+{
+	GPIO_PinState led_state = state ? LED_GPIO_ON : LED_GPIO_OFF;
+	if (led == 0) {
+		HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, led_state);
+	} else if (led == 1) {
+		HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, led_state);
+	}
+}
 /* USER CODE END 4 */
 
 /**

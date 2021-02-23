@@ -63,8 +63,6 @@ uint8_t scale_stream_row_ready(scale_stream_t *ctx, size_t row_idx)
 
 static int find_row_idx(scale_stream_t *ctx, size_t row)
 {
-    uint8_t found_empty = 0;
-    int oldest_index = -1;
     size_t oldest_row = SIZE_MAX;
     int idx = -1;
 
