@@ -151,6 +151,7 @@ static void picture_done(pngle_t *pngle)
 int load_png_image(uint8_t *addr, size_t size)
 {
 	pngle_t *pngle = pngle_new();
+	int res = 0;
 
 	pngle_set_draw_callback(pngle, picture_draw);
 	pngle_set_init_callback(pngle, picture_init);
@@ -162,8 +163,41 @@ int load_png_image(uint8_t *addr, size_t size)
 		printf("Image loaded\r\n");
 	} else {
 		printf("Image load failed with res %d\r\n", fed);
+		res = -1;
+	}
+
+	free(pngle);
+	return res;
+}
+
+static pngle_t *pngle_inst = NULL;
+
+int load_png_image_init(void)
+{
+	pngle_inst = pngle_new();
+	pngle_set_draw_callback(pngle_inst, picture_draw);
+	pngle_set_init_callback(pngle_inst, picture_init);
+	pngle_set_done_callback(pngle_inst, picture_done);
+	return 0;
+}
+
+int load_png_image_feed(uint8_t *buf, size_t size)
+{
+	if (!pngle_inst) {
 		return -1;
 	}
+	int fed = pngle_feed(pngle_inst, buf, size);
+	if (fed != size) {
+		printf("Failed to feed png image\r\n");
+		return -1;
+	}
+	return 0;
+}
+
+int load_png_image_release(void)
+{
+	free(pngle_inst);
+	pngle_inst = NULL;
 	return 0;
 }
 

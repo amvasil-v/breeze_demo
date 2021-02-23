@@ -29,6 +29,21 @@ extern DMA_HandleTypeDef hdma_quadspi;
 #define QSPI_RESET_MEMORY_CMD			0x99
 #define QSPI_SECTOR_ERASE_CMD			0x20
 #define QSPI_CHIP_ERASE_CMD				0xC7
+#define QSPI_PAGE_PROG_CMD              0x02
+#define QSPI_FAST_READ_CMD              0x0B
+#define QSPI_WRITE_ENABLE_CMD           0x06
+#define QSPI_READ_STATUS_REG_CMD        0x05
+#define QSPI_READ_VOL_CFG_REG_CMD       0x85
+#define QSPI_WRITE_VOL_CFG_REG_CMD      0x81
+
+#define QSPI_DUMMY_CLOCK_CYCLES_READ    8
+
+uint8_t QSPI_ResetMemory(QSPI_HandleTypeDef *hqspi);
+uint8_t QSPI_EnterFourBytesAddress(QSPI_HandleTypeDef *hqspi);
+void QSPI_WriteEnable(QSPI_HandleTypeDef *hqspi);
+void QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *hqspi, uint32_t timeout);
+void QSPI_DummyCyclesCfg(QSPI_HandleTypeDef *hqspi);
+int QSPI_test(void);
 
 static void QSPI_command_init(QSPI_CommandTypeDef *cmd)
 {
@@ -169,7 +184,7 @@ int QSPI_write_page(uint8_t *buf, size_t size, uint32_t dst)
 
 	/* Writing Sequence ------------------------------------------------ */
 	QSPI_command_init(&sCommand);
-	sCommand.Instruction = PAGE_PROG_CMD;
+	sCommand.Instruction = QSPI_PAGE_PROG_CMD;
 	sCommand.DataMode    = QSPI_DATA_1_LINE;
 	sCommand.Address     = dst;
 	sCommand.NbData      = size;
@@ -231,8 +246,8 @@ int QSPI_read_page(uint8_t *dst, size_t size, uint32_t addr)
 	/* Configure Volatile Configuration register (with new dummy cycles) */
 	QSPI_DummyCyclesCfg(&hqspi);
 	/* Reading Sequence ------------------------------------------------ */
-	sCommand.Instruction = FAST_READ_CMD;
-	sCommand.DummyCycles = DUMMY_CLOCK_CYCLES_READ;
+	sCommand.Instruction = QSPI_FAST_READ_CMD;
+	sCommand.DummyCycles = QSPI_DUMMY_CLOCK_CYCLES_READ;
 	sCommand.DataMode    = QSPI_DATA_1_LINE;
 	sCommand.Address     = addr;
 	sCommand.NbData      = size;
@@ -318,7 +333,7 @@ int QSPI_test(void)
 
 	printf("QSPI read device ID\r\n");
 
-	sCommand.Instruction = READ_MAN_DEVICE_ID;
+	sCommand.Instruction = QSPI_READ_MAN_DEVICE_ID_CMD;
 	sCommand.AddressMode = QSPI_ADDRESS_1_LINE;
 	sCommand.Address     = 0;
 	sCommand.DataMode    = QSPI_DATA_NONE;
@@ -372,7 +387,7 @@ int QSPI_test(void)
 	printf("QSPI write enabled\r\n");
 
 	/* Erasing Sequence -------------------------------------------------- */
-	sCommand.Instruction = SUBSECTOR_ERASE_CMD;
+	sCommand.Instruction = QSPI_SECTOR_ERASE_CMD;
 	sCommand.AddressMode = QSPI_ADDRESS_1_LINE;
 	sCommand.Address     = address;
 	sCommand.DataMode    = QSPI_DATA_NONE;
@@ -399,7 +414,7 @@ int QSPI_test(void)
 	}
 
 	/* Writing Sequence ------------------------------------------------ */
-	sCommand.Instruction = PAGE_PROG_CMD;
+	sCommand.Instruction = QSPI_PAGE_PROG_CMD;
 	sCommand.AddressMode = QSPI_ADDRESS_1_LINE;
 	sCommand.DataMode    = QSPI_DATA_1_LINE;
 	sCommand.Address     = address;
@@ -434,8 +449,8 @@ int QSPI_test(void)
 	QSPI_DummyCyclesCfg(&hqspi);
 
 	/* Reading Sequence ------------------------------------------------ */
-	sCommand.Instruction = FAST_READ_CMD;
-	sCommand.DummyCycles = DUMMY_CLOCK_CYCLES_READ;
+	sCommand.Instruction = QSPI_FAST_READ_CMD;
+	sCommand.DummyCycles = QSPI_DUMMY_CLOCK_CYCLES_READ;
 	sCommand.DataMode    = QSPI_DATA_1_LINE;
 	sCommand.Address     = address;
 	sCommand.NbData      = QSPI_READ_BUF_SIZE;
@@ -502,41 +517,6 @@ uint8_t QSPI_ResetMemory(QSPI_HandleTypeDef *phqspi)
 }
 
 /**
- * @brief  This function set the QSPI memory in 4-byte address mode
- * @param  hqspi: QSPI handle
- * @retval None
- */
-uint8_t QSPI_EnterFourBytesAddress(QSPI_HandleTypeDef *phqspi)
-{
-	QSPI_CommandTypeDef s_command;
-
-	/* Initialize the command */
-	s_command.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
-	s_command.Instruction       = ENTER_4_BYTE_ADDR_MODE_CMD;
-	s_command.AddressMode       = QSPI_ADDRESS_NONE;
-	s_command.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-	s_command.DataMode          = QSPI_DATA_NONE;
-	s_command.DummyCycles       = 0;
-	s_command.DdrMode           = QSPI_DDR_MODE_DISABLE;
-	s_command.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-	s_command.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-	/* Enable write operations */
-	QSPI_WriteEnable(phqspi);
-
-	/* Send the command */
-	if (HAL_QSPI_Command(phqspi, &s_command, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-	{
-		return HAL_ERROR;
-	}
-
-	/* Configure automatic polling mode to wait the memory is ready */
-	QSPI_AutoPollingMemReady(phqspi, HAL_QPSI_TIMEOUT_DEFAULT_VALUE);
-
-	return HAL_OK;
-}
-
-/**
  * @brief  This function send a Write Enable and wait it is effective.
  * @param  hqspi: QSPI handle
  * @retval None
@@ -548,7 +528,7 @@ void QSPI_WriteEnable(QSPI_HandleTypeDef *phqspi)
 
 	/* Enable write operations ------------------------------------------ */
 	sCommand.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
-	sCommand.Instruction       = WRITE_ENABLE_CMD;
+	sCommand.Instruction       = QSPI_WRITE_ENABLE_CMD;
 	sCommand.AddressMode       = QSPI_ADDRESS_NONE;
 	sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
 	sCommand.DataMode          = QSPI_DATA_NONE;
@@ -571,7 +551,7 @@ void QSPI_WriteEnable(QSPI_HandleTypeDef *phqspi)
 	sConfig.Interval        = 0x10;
 	sConfig.AutomaticStop   = QSPI_AUTOMATIC_STOP_ENABLE;
 
-	sCommand.Instruction    = READ_STATUS_REG_CMD;
+	sCommand.Instruction    = QSPI_READ_STATUS_REG_CMD;
 	sCommand.DataMode       = QSPI_DATA_1_LINE;
 
 	if (HAL_QSPI_AutoPolling(phqspi, &sCommand, &sConfig, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
@@ -593,7 +573,7 @@ void QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *phqspi, uint32_t timeout)
 
 	/* Configure automatic polling mode to wait for memory ready ------ */
 	sCommand.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
-	sCommand.Instruction       = READ_STATUS_REG_CMD;
+	sCommand.Instruction       = QSPI_READ_STATUS_REG_CMD;
 	sCommand.AddressMode       = QSPI_ADDRESS_NONE;
 	sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
 	sCommand.DataMode          = QSPI_DATA_1_LINE;
@@ -627,7 +607,7 @@ void QSPI_DummyCyclesCfg(QSPI_HandleTypeDef *phqspi)
 
 	/* Read Volatile Configuration register --------------------------- */
 	sCommand.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
-	sCommand.Instruction       = READ_VOL_CFG_REG_CMD;
+	sCommand.Instruction       = QSPI_READ_VOL_CFG_REG_CMD;
 	sCommand.AddressMode       = QSPI_ADDRESS_NONE;
 	sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
 	sCommand.DataMode          = QSPI_DATA_1_LINE;
@@ -651,8 +631,8 @@ void QSPI_DummyCyclesCfg(QSPI_HandleTypeDef *phqspi)
 	QSPI_WriteEnable(phqspi);
 
 	/* Write Volatile Configuration register (with new dummy cycles) -- */
-	sCommand.Instruction = WRITE_VOL_CFG_REG_CMD;
-	MODIFY_REG(reg, 0xF0, (DUMMY_CLOCK_CYCLES_READ << POSITION_VAL(0xF0)));
+	sCommand.Instruction = QSPI_WRITE_VOL_CFG_REG_CMD;
+	MODIFY_REG(reg, 0xF0, (QSPI_DUMMY_CLOCK_CYCLES_READ << POSITION_VAL(0xF0)));
 
 	if (HAL_QSPI_Command(phqspi, &sCommand, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
 	{

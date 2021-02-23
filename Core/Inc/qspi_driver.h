@@ -10,13 +10,7 @@
 
 #include "main.h"
 
-uint8_t QSPI_ResetMemory(QSPI_HandleTypeDef *hqspi);
-uint8_t QSPI_EnterFourBytesAddress(QSPI_HandleTypeDef *hqspi);
-void QSPI_WriteEnable(QSPI_HandleTypeDef *hqspi);
-void QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *hqspi, uint32_t timeout);
-void QSPI_DummyCyclesCfg(QSPI_HandleTypeDef *hqspi);
-
-int QSPI_test(void);
+#define QSPI_PAGE_SIZE                  256
 
 int QSPI_init_device(void);
 int QSPI_sector_erase(uint32_t address);

@@ -22,6 +22,9 @@ int display_deinit(void);
 
 int load_png_image(uint8_t *addr, size_t size);
 int display_png_image(void);
+int load_png_image_init(void);
+int load_png_image_feed(uint8_t *buf, size_t size);
+int load_png_image_release(void);
 
 
 #endif /* INC_DISPLAY_H_ */

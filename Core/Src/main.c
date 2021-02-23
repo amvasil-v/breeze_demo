@@ -68,7 +68,7 @@ static void MX_USART6_UART_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_QUADSPI_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void qspi_test(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -164,9 +164,6 @@ int main(void)
 	HAL_Delay(400);
 	printf("App started\r\n");
 	HAL_Delay(100);
-
-	const size_t pattern_size = 150000;
-	const size_t flash_addr = 0x0;
 	led_set(0, 0);
 	led_set(1, 0);
 
@@ -174,59 +171,59 @@ int main(void)
 		printf("Failed to init QSPI flash\r\n");
 		Error_Handler();
 	}
-	if (QSPI_area_erase(flash_addr, pattern_size)) {
+
+	const size_t qspi_addr = 0;
+
+	//#define PROGRAM_IMAGE_QSPI
+#ifdef PROGRAM_IMAGE_QSPI
+
+	if (QSPI_area_erase(qspi_addr, PNG_IMAGE_SIZE)) {
 		printf("Failed to erase QSPI flash\r\n");
 		Error_Handler();
 	}
 	HAL_Delay(100);
-	if (QSPI_write_pattern(flash_addr, pattern_size)) {
-		printf("Failed to write pattern\r\n");
-		Error_Handler();
+	size_t bytes_written = 0;
+	const size_t write_chunk = QSPI_PAGE_SIZE;
+	static uint8_t write_buf[QSPI_PAGE_SIZE];
+	while (bytes_written < PNG_IMAGE_SIZE) {
+		size_t to_write = PNG_IMAGE_SIZE - bytes_written;
+		if (to_write > write_chunk) {
+			to_write = write_chunk;
+		}
+		memcpy(write_buf, (uint8_t *)PNG_IMAGE_ADDRESS + bytes_written, to_write);
+		if (QSPI_write_page(write_buf, to_write, qspi_addr + bytes_written)) {
+			Error_Handler();
+		}
+		bytes_written += to_write;
 	}
-	HAL_Delay(100);
+	printf("Written PNG image to QSPI flash\r\n");
+#endif
+
 	led_set(1, 1);
-	if (QSPI_verify_pattern(flash_addr, pattern_size)) {
-		printf("Failed to verify pattern\r\n");
-		Error_Handler();
+	load_png_image_init();
+	size_t bytes_fed = 0;
+	const size_t feed_chunk = QSPI_PAGE_SIZE;
+	static uint8_t qspi_read_buf[QSPI_PAGE_SIZE];
+	while (bytes_fed < PNG_IMAGE_SIZE) {
+		size_t to_feed = PNG_IMAGE_SIZE - bytes_fed;
+		if (to_feed > feed_chunk) {
+			to_feed = feed_chunk;
+		}
+		if (QSPI_read_page(qspi_read_buf, to_feed, qspi_addr + bytes_fed)) {
+			Error_Handler();
+		}
+		if (load_png_image_feed(qspi_read_buf, to_feed)) {
+			printf("Feed failed at %u\r\n", bytes_fed);
+			Error_Handler();
+		}
+		bytes_fed += to_feed;
 	}
-	led_set(0, 0);
-
-	/*HAL_Delay(1000);
-	if (QSPI_sector_erase(flash_addr)) {
-		printf("Failed to erase QSPI flash\r\n");
-		Error_Handler();
-	}
-	HAL_Delay(100);
-
-	uint8_t buf[10];
-	if (QSPI_read_page(buf, 10, flash_addr)) {
-		printf("Failed to read buf\r\n");
-		Error_Handler();
-	}
-	printf("read buf:\r\n");
-
-	for (int i = 0; i < 10; i++) {
-		printf("0x%02x \n", buf[i]);
-	}
-	printf("\r\n");*/
-
-	/*if (QSPI_test()) {
-		Error_Handler();
-	}*/
-
-//#define SKIP_DISPLAY
-#ifndef SKIP_DISPLAY
-	if(load_png_image((uint8_t *)PNG_IMAGE_ADDRESS, PNG_IMAGE_SIZE)) {
-		Error_Handler();
-	}
+	load_png_image_release();
 
 	display_init();
 	display_png_image();
-	/*HAL_Delay(10000);
-	display_clear();*/
 	HAL_Delay(100);
 	display_deinit();
-#endif
 
 	while (1)
 	{
@@ -486,6 +483,34 @@ void led_set(uint8_t led, uint8_t state)
 	} else if (led == 1) {
 		HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, led_state);
 	}
+}
+
+__attribute__ ((unused))
+static void qspi_test(void)
+{
+	const size_t pattern_size = 150000;
+	const size_t flash_addr = 0x0;
+
+	if (QSPI_init_device()) {
+		printf("Failed to init QSPI flash\r\n");
+		Error_Handler();
+	}
+	if (QSPI_area_erase(flash_addr, pattern_size)) {
+		printf("Failed to erase QSPI flash\r\n");
+		Error_Handler();
+	}
+	HAL_Delay(100);
+	if (QSPI_write_pattern(flash_addr, pattern_size)) {
+		printf("Failed to write pattern\r\n");
+		Error_Handler();
+	}
+	HAL_Delay(100);
+	led_set(1, 1);
+	if (QSPI_verify_pattern(flash_addr, pattern_size)) {
+		printf("Failed to verify pattern\r\n");
+		Error_Handler();
+	}
+	led_set(0, 0);
 }
 /* USER CODE END 4 */
 
