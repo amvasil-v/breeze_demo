@@ -28,6 +28,7 @@
 #include "display.h"
 #include "qspi_driver.h"
 #include "esp_uart.h"
+#include "wifi_cred.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -175,10 +176,12 @@ int main(void)
 		Error_Handler();
 	}
 
-	const size_t qspi_addr = 0;
-
 	esp_bridge_t *esp = esp_bridge_create();
-	HAL_Delay(200);
+	int esp_ret;
+	const char *ssid = ESP_WIFI_SSID;
+	uint8_t do_connect = 0;
+	printf("ESP: Waiting for boot\r\n");
+	HAL_Delay(4000);
 
 	if (esp_command_ate0(esp)) {
 		printf("ESP: Failed to set ATE0\r\n");
@@ -187,8 +190,33 @@ int main(void)
 		printf("ESP: set ATE0\r\n");
 	}
 
+	esp_ret = esp_command_cwjap_query(esp, ssid);
+	if (esp_ret < 0) {
+		Error_Handler();
+	}
+	if (esp_ret == 0) {
+		printf("ESP: Connect to AP:\r\n");
+		do_connect = 1;
+	}
+	if (esp_ret != 1) {
+		printf("ESP: Invalid ESP state\r\n");
+		Error_Handler();
+	}
+
+	if (do_connect) {
+		esp_command_cwjap_connect(esp,ssid,ESP_WIFI_PASSWD);
+		esp_ret = esp_command_cwjap_query(esp, ssid);
+		if (esp_ret != 1) {
+			printf("ESP: Failed to connect to AP\r\n");
+			Error_Handler();
+		}
+	}
+
+	printf("ESP: Connected to AP %s\r\n", ssid);
+
 	//#define PROGRAM_IMAGE_QSPI
 #ifdef PROGRAM_IMAGE_QSPI
+	const size_t qspi_addr = 0;
 
 	if (QSPI_area_erase(qspi_addr, PNG_IMAGE_SIZE)) {
 		printf("Failed to erase QSPI flash\r\n");

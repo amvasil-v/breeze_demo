@@ -28,5 +28,8 @@ int esp_bridge_read_timeout(esp_bridge_t * br, char *buf, size_t len, uint32_t t
 uint8_t esp_bridge_connected(esp_bridge_t * br);
 
 int esp_command_ate0(esp_bridge_t *esp);
+int esp_flush_input(esp_bridge_t *esp);
+int esp_command_cwjap_query(esp_bridge_t *esp, const char *ssid);
+int esp_command_cwjap_connect(esp_bridge_t *esp, const char *ssid, const char *passwd);
 
 #endif /* HTTPS_CLIENT_ESP_UART_H_ */

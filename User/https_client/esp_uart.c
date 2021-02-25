@@ -71,13 +71,13 @@ uint8_t esp_bridge_connected(esp_bridge_t * br)
 
 int esp_bridge_write(esp_bridge_t *br, const char *buf, size_t len)
 {
-	if (HAL_UART_Transmit(&huart1, buf, len, ESP_UART_DEFAULT_TIMEOUT) != HAL_OK) {
+	if (HAL_UART_Transmit(&huart1, (uint8_t *)buf, len, ESP_UART_DEFAULT_TIMEOUT) != HAL_OK) {
 		return -1;
 	}
 	return 0;
 }
 
-static int esp_uart_try_receive(size_t len, uint8_t *buf)
+static int esp_uart_try_receive(size_t len, char *buf)
 {
 	int copied = 0;
 	if (esp_rx_wrapped) {
@@ -111,10 +111,10 @@ int esp_bridge_read_timeout(esp_bridge_t * br, char *buf, size_t len, uint32_t t
 {
 	uint32_t start_tick = HAL_GetTick();
 	int copied = 0;
-	while (HAL_GetTick() - start_tick <= timeout) {
-		copied += esp_uart_try_receive(len - copied, &buf[copied]);
+	do {
+		copied += esp_uart_try_receive(len - (size_t)copied, &buf[copied]);
 		HAL_Delay(1);
-	}
+	} while (HAL_GetTick() - start_tick <= timeout);
 	return copied;
 }
 
@@ -125,19 +125,65 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	}
 }
 
-static uint8_t command_resp[256];
+#define ESP_COMMAND_RESP_BUF_SIZE		256
 
-int esp_command_ate0(esp_bridge_t *esp)
+static char command_resp[ESP_COMMAND_RESP_BUF_SIZE];
+
+int esp_flush_input(esp_bridge_t *esp)
 {
-	esp_bridge_write(esp, "ATE0\r\n", 6);
-	HAL_Delay(100);
-	int ret = esp_bridge_read_timeout(esp, command_resp, 256, 200);
+	while (1) {
+		int ret = esp_bridge_read_timeout(esp, command_resp, ESP_COMMAND_RESP_BUF_SIZE, 0);
+		if (ret <= 0)
+			break;
+	}
+	return 0;
+}
+
+static int esp_at_cmd(esp_bridge_t *esp, const char *cmd, uint32_t delay)
+{
+	esp_bridge_write(esp, cmd, strlen(cmd));
+	HAL_Delay(delay);
+	int ret = esp_bridge_read_timeout(esp, command_resp, ESP_COMMAND_RESP_BUF_SIZE, 200);
 	if (ret > 0) {
 		command_resp[ret] = 0;
 		printf("Rx %d: %s", ret, command_resp);
+		return 0;
+	}
+	printf("No response for AT cmd %s\n", cmd);
+	return -1;
+
+}
+
+int esp_command_ate0(esp_bridge_t *esp)
+{
+	static const char *cmd = "ATE0\r\n";
+	if (esp_at_cmd(esp, cmd, 100)) {
+		return -1;
 	}
 	if (!strstr(command_resp, "OK\r\n"))
 		return -1;
+	return 0;
+}
+
+int esp_command_cwjap_query(esp_bridge_t *esp, const char *ssid)
+{
+	static const char *cmd = "AT+CWJAP?\r\n";
+	if (esp_at_cmd(esp, cmd, 1000)) {
+		return -1;
+	}
+	if (strstr(command_resp, "No AP\r\n"))
+		return 0;
+	if (strstr(command_resp, ssid))
+		return 1;
+	return 2;
+}
+
+int esp_command_cwjap_connect(esp_bridge_t *esp, const char *ssid, const char *passwd)
+{
+	sprintf(command_resp, "AT+CWJAP=\"%s\",\"%s\"\r\n", ssid, passwd);
+	if (esp_at_cmd(esp, command_resp, 3000)) {
+		return -1;
+	}
 	return 0;
 }
 
