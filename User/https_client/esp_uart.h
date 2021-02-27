@@ -32,4 +32,6 @@ int esp_flush_input(esp_bridge_t *esp);
 int esp_command_cwjap_query(esp_bridge_t *esp, const char *ssid);
 int esp_command_cwjap_connect(esp_bridge_t *esp, const char *ssid, const char *passwd);
 
+void esp_test_read_write(void);
+
 #endif /* HTTPS_CLIENT_ESP_UART_H_ */

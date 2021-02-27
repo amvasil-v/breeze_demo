@@ -19,7 +19,7 @@
 static size_t png_image_width;
 static size_t png_image_height;
 static uint8_t display_buffer[DISPLAY_BUFFER_SIZE];
-static uint8_t tmp_buf[DISPLAY_WIDTH * SCALE_STREAM_MAX_ROWS];
+static uint8_t tmp_buf[800 * SCALE_STREAM_MAX_ROWS];
 static size_t out_width_bytes;
 static scale_stream_t scale_ctx;
 static int draw_error = 0;

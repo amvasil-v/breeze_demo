@@ -26,9 +26,8 @@
 #include <stdio.h>
 
 #include "display.h"
-#include "qspi_driver.h"
-#include "esp_uart.h"
-#include "wifi_cred.h"
+#include "ext_storage.h"
+#include "https_download.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -83,7 +82,7 @@ static int uart_send_buf(const char *buf, size_t len)
 	if (HAL_UART_GetState(&huart6) != HAL_UART_STATE_READY)
 		return -1;
 	if (HAL_DMA_GetState(&hdma_usart6_tx) == HAL_DMA_STATE_BUSY) {
-		HAL_Delay(100);
+		HAL_Delay(10);
 		if (HAL_DMA_GetState(&hdma_usart6_tx) == HAL_DMA_STATE_BUSY) {
 			return -1;
 		}
@@ -171,87 +170,46 @@ int main(void)
 	led_set(0, 0);
 	led_set(1, 0);
 
-	if (QSPI_init_device()) {
-		printf("Failed to init QSPI flash\r\n");
-		Error_Handler();
-	}
-
-	esp_bridge_t *esp = esp_bridge_create();
-	int esp_ret;
-	const char *ssid = ESP_WIFI_SSID;
-	uint8_t do_connect = 0;
-	printf("ESP: Waiting for boot\r\n");
-	HAL_Delay(4000);
-
-	if (esp_command_ate0(esp)) {
-		printf("ESP: Failed to set ATE0\r\n");
-		Error_Handler();
-	} else {
-		printf("ESP: set ATE0\r\n");
-	}
-
-	esp_ret = esp_command_cwjap_query(esp, ssid);
-	if (esp_ret < 0) {
-		Error_Handler();
-	}
-	if (esp_ret == 0) {
-		printf("ESP: Connect to AP:\r\n");
-		do_connect = 1;
-	}
-	if (esp_ret != 1) {
-		printf("ESP: Invalid ESP state\r\n");
-		Error_Handler();
-	}
-
-	if (do_connect) {
-		esp_command_cwjap_connect(esp,ssid,ESP_WIFI_PASSWD);
-		esp_ret = esp_command_cwjap_query(esp, ssid);
-		if (esp_ret != 1) {
-			printf("ESP: Failed to connect to AP\r\n");
-			Error_Handler();
-		}
-	}
-
-	printf("ESP: Connected to AP %s\r\n", ssid);
-
-	//#define PROGRAM_IMAGE_QSPI
-#ifdef PROGRAM_IMAGE_QSPI
-	const size_t qspi_addr = 0;
-
-	if (QSPI_area_erase(qspi_addr, PNG_IMAGE_SIZE)) {
-		printf("Failed to erase QSPI flash\r\n");
-		Error_Handler();
-	}
-	HAL_Delay(100);
-	size_t bytes_written = 0;
-	const size_t write_chunk = QSPI_PAGE_SIZE;
-	static uint8_t write_buf[QSPI_PAGE_SIZE];
-	while (bytes_written < PNG_IMAGE_SIZE) {
-		size_t to_write = PNG_IMAGE_SIZE - bytes_written;
-		if (to_write > write_chunk) {
-			to_write = write_chunk;
-		}
-		memcpy(write_buf, (uint8_t *)PNG_IMAGE_ADDRESS + bytes_written, to_write);
-		if (QSPI_write_page(write_buf, to_write, qspi_addr + bytes_written)) {
-			Error_Handler();
-		}
-		bytes_written += to_write;
-	}
-	printf("Written PNG image to QSPI flash\r\n");
+#ifdef ESP_TEST_READ_WRITE
+	esp_test_read_write();
 #endif
 
+	static const size_t image_max_size = 110000;
+	static const uint32_t image_ext_addr = 0x0;
+	static const char *image_url = "https://imgs.xkcd.com/comics/archimedes.png";
+	ext_storage_t ext;
+	if (ext_storage_init(&ext)) {
+		Error_Handler();
+	}
+
+	if (ext_storage_prepare(&ext, image_ext_addr, image_max_size)) {
+		Error_Handler();
+	}
+
+	if (https_download_image(&ext, image_url)) {
+		printf("Failed to download image\r\n");
+		Error_Handler();
+	}
+
+	size_t png_image_size = ext.bytes_written;
+	printf("Image with size %u saved to QSPI flash\r\n", png_image_size);
+
+	/*ext_storage_test_read_write();*/
+
+
+#define DISPLAY_IMAGE
 #ifdef DISPLAY_IMAGE
 	led_set(1, 1);
 	load_png_image_init();
 	size_t bytes_fed = 0;
-	const size_t feed_chunk = QSPI_PAGE_SIZE;
-	static uint8_t qspi_read_buf[QSPI_PAGE_SIZE];
-	while (bytes_fed < PNG_IMAGE_SIZE) {
-		size_t to_feed = PNG_IMAGE_SIZE - bytes_fed;
+	const size_t feed_chunk = 256;
+	static uint8_t qspi_read_buf[256];
+	while (bytes_fed < png_image_size) {
+		size_t to_feed = png_image_size - bytes_fed;
 		if (to_feed > feed_chunk) {
 			to_feed = feed_chunk;
 		}
-		if (QSPI_read_page(qspi_read_buf, to_feed, qspi_addr + bytes_fed)) {
+		if (ext_storage_read(&ext, qspi_read_buf, to_feed, image_ext_addr + bytes_fed)) {
 			Error_Handler();
 		}
 		if (load_png_image_feed(qspi_read_buf, to_feed)) {
@@ -576,6 +534,8 @@ void led_set(uint8_t led, uint8_t state)
 		HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, led_state);
 	}
 }
+
+#include "qspi_driver.h"
 
 __attribute__ ((unused))
 static void qspi_test(void)

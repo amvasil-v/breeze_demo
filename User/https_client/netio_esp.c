@@ -8,7 +8,7 @@
 static int netio_esp_send(void *ctx, const unsigned char *buf, size_t len)
 {
     netio_esp_t *io = (netio_esp_t *)ctx;
-    esp_debug(ESP_DBG_INFO, "[ESP] Send %lu bytes\n", len);
+    esp_debug(ESP_DBG_INFO, "[ESP] Send %lu bytes\r\n", len);
     return esp_modem_tcp_send(&io->esp, buf, len);
 }
 
@@ -16,7 +16,7 @@ static int netio_esp_recv_timeout(void *ctx, unsigned char *buf, size_t len, uin
 {
     netio_esp_t *io = (netio_esp_t *)ctx;
     int res = esp_modem_tcp_receive(&io->esp, buf, len, timeout);
-    esp_debug(ESP_DBG_INFO, "[ESP] Received %d\n", res);
+    esp_debug(ESP_DBG_INFO, "[ESP] Received %d\r\n", res);
     return res;
 }
 
@@ -40,7 +40,7 @@ static uint8_t netio_esp_connected(void *ctx)
     return connected;
 } 
 
-netio_t *netio_esp_create(void)
+netio_t *netio_esp_create(esp_bridge_t *bridge)
 {
     netio_esp_t *ns_io = (netio_esp_t *)malloc(sizeof(netio_esp_t));
     netio_t *io = &ns_io->io;
@@ -53,7 +53,7 @@ netio_t *netio_esp_create(void)
     io->connected = netio_esp_connected;
     io->disconnect = netio_esp_disconnect;
     io->ctx = &ns_io->br;    
-    esp_bridge_init((esp_bridge_t *)io->ctx);
+    memcpy(io->ctx, bridge, sizeof(esp_bridge_t));
     esp_modem_init(&ns_io->esp, &ns_io->br);
     return io;
 }

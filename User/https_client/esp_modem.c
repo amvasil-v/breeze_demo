@@ -16,6 +16,9 @@ static const char *esp_modem_ipd_str = "\r\n+IPD,";
 static const char *esp_ok_str = "\r\nOK\r\n";
 static const char *esp_error_str = "\r\nERROR\r\n";
 
+static char rx_buf[2048];
+static char tx_buf[ESP_MODEM_RX_BUF_SIZE];
+
 static uint8_t esp_receive_buf_complete(const char *buf, size_t len)
 {
     
@@ -37,14 +40,12 @@ static void esp_reset_rx(esp_modem_t *esp)
 void esp_modem_init(esp_modem_t *esp, esp_bridge_t *bridge)
 {
     esp->br = bridge;
-    esp->rx_buf = (char *)malloc(2048);
-    esp->tx_buf = (char *)malloc(ESP_MODEM_RX_BUF_SIZE);
+    esp->rx_buf = rx_buf;
+    esp->tx_buf = tx_buf;
 }
 
 void esp_modem_release(esp_modem_t *esp)
 {
-    free(esp->rx_buf);
-    free(esp->tx_buf);
 }
 
 int esp_modem_tcp_connect(esp_modem_t *esp, const char *host, const char *port, uint32_t timeout)
@@ -73,16 +74,16 @@ int esp_modem_tcp_connect(esp_modem_t *esp, const char *host, const char *port, 
         if (esp_receive_buf_complete(esp->rx_buf, rx_len)) {
             if (esp_find_substr(esp->rx_buf, rx_len, connect_str, strlen(connect_str)) ||
                 esp_find_substr(esp->rx_buf, rx_len, acon_str, strlen(acon_str))) {
-                    esp_debug(ESP_DBG_WARN, "[ESP] TCP: connected to %s:%s\n", host, port);
+                    esp_debug(ESP_DBG_WARN, "[ESP] TCP: connected to %s:%s\r\n", host, port);
                     return 0;
                 }
-            esp_debug(ESP_DBG_ERROR, "Received invalid response: %s\n", esp->rx_buf);
+            esp_debug(ESP_DBG_ERROR, "[ESP] Received invalid response: %s\r\n", esp->rx_buf);
             return -1;
         }
         if (ptr > esp->rx_buf + ESP_MODEM_RX_BUF_SIZE)
             return -1;
     }
-    esp_debug(ESP_DBG_ERROR, "Connection timeout\n");
+    esp_debug(ESP_DBG_ERROR, "[ESP] Connection timeout\r\n");
     return -1;
 }
 
@@ -90,7 +91,7 @@ static int esp_confirm_tcp_send(esp_modem_t *esp)
 {
     int res;
     int i;
-    char *confirm;
+    const char *confirm;
     static const char *confirm_str = "\r\nSEND OK\r\n";
     size_t rx_len = 0;
 
@@ -104,11 +105,11 @@ static int esp_confirm_tcp_send(esp_modem_t *esp)
         rx_len += res;
         confirm = esp_find_substr(esp->rx_buf, rx_len, confirm_str, strlen(confirm_str));
         if (confirm) {
-            esp_debug(ESP_DBG_INFO, "[ESP] TX confirmed\n");
+            esp_debug(ESP_DBG_INFO, "[ESP] TX confirmed\r\n");
             return 0;
         }
     }
-    esp_debug(ESP_DBG_ERROR, "TX confirm timeout\n");
+    esp_debug(ESP_DBG_ERROR, "[ESP] TX confirm timeout\r\n");
     return -1;
 }
 
@@ -140,7 +141,7 @@ int esp_modem_tcp_send(esp_modem_t *esp, const char *buf, size_t len)
                 return -1;
         }
     }
-    esp_debug(ESP_DBG_ERROR, "TX timeout\n");
+    esp_debug(ESP_DBG_ERROR, "[ESP] TX timeout\r\n");
     return -1;
 }
 
@@ -193,7 +194,7 @@ static int esp_modem_receive_data(esp_modem_t *esp, char *out_buf, size_t req_le
     esp->rx_rptr += read_bytes;
 
     if (esp->ipd_len < read_bytes) {
-        esp_debug(ESP_DBG_ERROR, "Read error: saved ipd_len %d < read_bytes %d\n", esp->ipd_len, read_bytes);
+        esp_debug(ESP_DBG_ERROR, "[ESP] Read error: saved ipd_len %d < read_bytes %d\r\n", esp->ipd_len, read_bytes);
         esp_reset_rx(esp);
         return -1;
     }
@@ -209,7 +210,7 @@ static int esp_modem_receive_data(esp_modem_t *esp, char *out_buf, size_t req_le
     int res = esp_bridge_read_timeout(esp->br, esp->rx_wptr, rem_len, timeout);
     if (res <= 0)
     {
-        esp_debug(ESP_DBG_ERROR, "TCP read data timeout %d\n", res);
+        esp_debug(ESP_DBG_ERROR, "[ESP] TCP read data timeout %d\r\n", res);
         return -1;
     }
     read_bytes += res;
@@ -217,7 +218,7 @@ static int esp_modem_receive_data(esp_modem_t *esp, char *out_buf, size_t req_le
     esp->rx_wptr += res;
     esp->rx_rptr = esp->rx_wptr;
     if (esp->ipd_len < res) {
-        esp_debug(ESP_DBG_ERROR, "Read error: ipd_len < read_bytes\n");
+        esp_debug(ESP_DBG_ERROR, "[ESP] Read error: ipd_len < read_bytes\r\n");
         esp_reset_rx(esp);
         return -1;
     }
@@ -232,7 +233,7 @@ static int esp_modem_receive_data(esp_modem_t *esp, char *out_buf, size_t req_le
 static int esp_modem_receive_ipd(esp_modem_t *esp, uint32_t timeout)
 {
     int res;
-    char *ipd_ptr;
+    const char *ipd_ptr;
     char *data_ptr;
     uint32_t tim = 0;
     uint32_t ipd_len = 0;
@@ -251,16 +252,16 @@ static int esp_modem_receive_ipd(esp_modem_t *esp, uint32_t timeout)
         }
         data_ptr = (char *)esp_modem_get_ipd(ipd_ptr + strlen(esp_modem_ipd_str), &ipd_len);
         if (!data_ptr) {
-            esp_debug(ESP_DBG_ERROR, "Failed to parse IPD\n");
+            esp_debug(ESP_DBG_ERROR, "[ESP] Failed to parse IPD\r\n");
             return -1;
         }
-        esp_debug(ESP_DBG_INFO, "[ESP] Received IPD %d\n", ipd_len);
+        esp_debug(ESP_DBG_INFO, "[ESP] Received IPD %d\r\n", ipd_len);
         esp->rx_rptr = data_ptr;       
         esp->ipd_len = ipd_len;
         return 0;
     };
 
-    esp_debug(ESP_DBG_ERROR, "TCP IPD read timeout\n");
+    esp_debug(ESP_DBG_ERROR, "[ESP] TCP IPD read timeout\r\n");
     return -1;
 }
 
@@ -284,7 +285,7 @@ int esp_modem_tcp_receive(esp_modem_t *esp, char *buf, size_t len, uint32_t time
         return esp_modem_receive_data(esp, buf, len, timeout);
     }
 
-    esp_debug(ESP_DBG_ERROR, "TCP read timeout\n");
+    esp_debug(ESP_DBG_ERROR, "[ESP] TCP read timeout\r\n");
     return -1;
 }
 
@@ -296,7 +297,7 @@ int esp_modem_tcp_close(esp_modem_t *esp)
     int res = esp_bridge_write(esp->br, cipclose_str, strlen(cipclose_str));
     if (res < 0)
         return -1;
-    esp_debug(ESP_DBG_WARN, "[ESP] Sent CIPCLOSE\n");
+    esp_debug(ESP_DBG_WARN, "[ESP] Sent CIPCLOSE\r\n");
     return 0;
 }
 

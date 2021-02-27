@@ -14,7 +14,7 @@ struct _netio_esp_t
 
 typedef struct _netio_esp_t netio_esp_t;
 
-netio_t *netio_esp_create(void);
+netio_t *netio_esp_create(esp_bridge_t *bridge);
 int netio_esp_init(netio_t *io);
 void netio_esp_free(netio_t *io);
 

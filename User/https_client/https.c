@@ -7,8 +7,8 @@
 #include <string.h>
 #include <errno.h>
 
-#include "ca_cert.h"
 #include "https.h"
+#include "ca_cert.h"
 
 /*---------------------------------------------------------------------*/
 static int _error;
@@ -482,8 +482,7 @@ static int https_connect(HTTP_INFO *hi, char *host, char *port)
             return ret;
         }
 
-        ca_crt_rsa[ca_crt_rsa_size - 1] = 0;
-        ret = mbedtls_x509_crt_parse(&hi->tls.cacert, (uint8_t *)ca_crt_rsa, ca_crt_rsa_size);
+        ret = mbedtls_x509_crt_parse(&hi->tls.cacert, (uint8_t *)ca_cert_globalsign, strlen(ca_cert_globalsign) + 1);
         if( ret != 0 )
         {
             return ret;
@@ -500,7 +499,7 @@ static int https_connect(HTTP_INFO *hi, char *host, char *port)
 
         /* OPTIONAL is not optimal for security,
          * but makes interop easier in this simplified example */
-        mbedtls_ssl_conf_authmode( &hi->tls.conf, MBEDTLS_SSL_VERIFY_OPTIONAL );
+        mbedtls_ssl_conf_authmode( &hi->tls.conf, MBEDTLS_SSL_VERIFY_REQUIRED );
         mbedtls_ssl_conf_ca_chain( &hi->tls.conf, &hi->tls.cacert, NULL );
         mbedtls_ssl_conf_rng( &hi->tls.conf, mbedtls_ctr_drbg_random, &hi->tls.ctr_drbg );
         mbedtls_ssl_conf_read_timeout( &hi->tls.conf, 5000 );
@@ -539,7 +538,7 @@ static int https_connect(HTTP_INFO *hi, char *host, char *port)
         /* In real life, we probably want to bail out when ret != 0 */
         if( hi->tls.verify && (mbedtls_ssl_get_verify_result(&hi->tls.ssl) != 0) )
         {
-            return MBEDTLS_ERR_X509_CERT_VERIFY_FAILED;
+            return -1;
         }
     }
 
