@@ -18,6 +18,7 @@ struct _esp_bridge_t {
 };
 typedef struct _esp_bridge_t esp_bridge_t;
 
+void esp_reset(uint8_t reset);
 esp_bridge_t *esp_bridge_create(void);
 void esp_bridge_init(esp_bridge_t * br);
 int esp_bridge_check(esp_bridge_t * br);

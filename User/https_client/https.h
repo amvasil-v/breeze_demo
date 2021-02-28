@@ -85,6 +85,8 @@ typedef struct
     size_t      range_start;
     size_t      range_end;
     size_t      content_length;
+
+    BOOL        header_only;
 } HTTP_INFO;
 
 
@@ -95,6 +97,7 @@ char *strtoken(char *src, char *dst, int size);
 int  http_init(HTTP_INFO *hi, BOOL verify, netio_t *io);
 int  http_close(HTTP_INFO *hi);
 int  http_get(HTTP_INFO *hi, char *url, char *response, int size, netio_t *io);
+int http_get_header(HTTP_INFO *hi, char *url, char *response, int size, netio_t *io);
 
 void http_strerror(char *buf, int len);
 int  http_open(HTTP_INFO *hi, char *url, netio_t *io);

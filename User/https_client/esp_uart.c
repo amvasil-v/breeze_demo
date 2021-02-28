@@ -31,15 +31,16 @@ esp_bridge_t *esp_bridge_create(void)
 	return br;
 }
 
+void esp_reset(uint8_t reset)
+{
+	HAL_GPIO_WritePin(ESPRST_GPIO_Port, ESPRST_Pin, reset ? GPIO_PIN_RESET : GPIO_PIN_SET);
+	HAL_Delay(100);
+}
+
 void esp_bridge_init(esp_bridge_t * br)
 {
 	memset(br, 0, sizeof(esp_bridge_t));
 	br->id = 1;
-
-	HAL_GPIO_WritePin(ESPRST_GPIO_Port, ESPRST_Pin, GPIO_PIN_RESET);
-	HAL_Delay(100);
-	HAL_GPIO_WritePin(ESPRST_GPIO_Port, ESPRST_Pin, GPIO_PIN_SET);
-	HAL_Delay(500);
 
 	esp_rx_read_it = 0;
 	esp_rx_wrapped = 0;
@@ -83,7 +84,7 @@ static int esp_uart_try_receive(size_t len, char *buf)
 	size_t to_copy = len;
 	if (esp_rx_wrapped) {
 		size_t remain = ESP_UART_RX_BUF_SIZE - esp_rx_read_it;
-		printf("RX Buffer wrapped, remain %u, get %u\r\n", remain, to_copy);
+		//printf("RX Buffer wrapped, remain %u, get %u\r\n", remain, to_copy);
 		if (to_copy >= remain) {
 			to_copy = remain;
 			esp_rx_wrapped = 0;

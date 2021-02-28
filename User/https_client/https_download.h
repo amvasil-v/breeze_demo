@@ -14,6 +14,6 @@
 #include "ext_storage.h"
 
 int esp_init(esp_bridge_t *esp);
-int https_download_image(ext_storage_t *storage, const char *url);
+int https_download_image(ext_storage_t *storage, size_t *image_size);
 
 #endif /* HTTPS_CLIENT_HTTPS_DOWNLOAD_H_ */

@@ -47,7 +47,7 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-
+#define PNG_MAX_SIZE		150000
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

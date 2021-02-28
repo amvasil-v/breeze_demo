@@ -170,28 +170,27 @@ int main(void)
 	led_set(0, 0);
 	led_set(1, 0);
 
+	esp_reset(1);
+	HAL_Delay(200);
+	esp_reset(0);
+	display_init();
+
+
 #ifdef ESP_TEST_READ_WRITE
 	esp_test_read_write();
 #endif
 
-	static const size_t image_max_size = 110000;
-	static const uint32_t image_ext_addr = 0x0;
-	static const char *image_url = "https://imgs.xkcd.com/comics/archimedes.png";
 	ext_storage_t ext;
+	size_t png_image_size;
 	if (ext_storage_init(&ext)) {
 		Error_Handler();
 	}
 
-	if (ext_storage_prepare(&ext, image_ext_addr, image_max_size)) {
-		Error_Handler();
-	}
-
-	if (https_download_image(&ext, image_url)) {
+	if (https_download_image(&ext, &png_image_size)) {
 		printf("Failed to download image\r\n");
 		Error_Handler();
 	}
 
-	size_t png_image_size = ext.bytes_written;
 	printf("Image with size %u saved to QSPI flash\r\n", png_image_size);
 
 	/*ext_storage_test_read_write();*/
@@ -209,7 +208,7 @@ int main(void)
 		if (to_feed > feed_chunk) {
 			to_feed = feed_chunk;
 		}
-		if (ext_storage_read(&ext, qspi_read_buf, to_feed, image_ext_addr + bytes_fed)) {
+		if (ext_storage_read(&ext, qspi_read_buf, to_feed, ext.start_address + bytes_fed)) {
 			Error_Handler();
 		}
 		if (load_png_image_feed(qspi_read_buf, to_feed)) {
@@ -220,7 +219,6 @@ int main(void)
 	}
 	load_png_image_release();
 
-	display_init();
 	display_png_image();
 	HAL_Delay(100);
 	display_deinit();
