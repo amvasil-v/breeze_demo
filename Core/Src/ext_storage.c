@@ -63,6 +63,7 @@ int ext_storage_prepare(ext_storage_t *ext, uint32_t store_addr, size_t size)
 		return -1;
 	}
 	HAL_Delay(100);
+	led_set(0, 0);
 	return 0;
 }
 

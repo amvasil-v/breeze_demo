@@ -78,7 +78,9 @@
 /**
  * delay x ms
 **/
-#define DEV_Delay_ms(__xms) HAL_Delay(__xms);
+#define DEV_Delay_ms(__xms) DEV_Delay_ms_impl(__xms);
+
+extern void DEV_Delay_ms_impl(uint32_t ms);
 
 void DEV_SPI_WriteByte(UBYTE value);
 

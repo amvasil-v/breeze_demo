@@ -40,8 +40,9 @@ void DEV_SPI_WriteByte(UBYTE value)
 
 int DEV_Module_Init(void)
 {
+	DEV_Delay_ms(1000);
 	DEV_Digital_Write(EPD_RST_PIN, 0);
-	DEV_Delay_ms(500);
+	DEV_Delay_ms(1000);
 
     DEV_Digital_Write(EPD_DC_PIN, 0);
     DEV_Digital_Write(EPD_CS_PIN, 0);
