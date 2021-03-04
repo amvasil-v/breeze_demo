@@ -175,12 +175,15 @@ int main(void)
 	led_set(0, 0);
 	led_set(1, 0);
 
-	//bme_driver_test();
+	if (bme_driver_init()) {
+		Error_Handler();
+	}
 
 	esp_reset(1);
 	HAL_Delay(200);
 	esp_reset(0);
 	display_init();
+
 
 
 #ifdef ESP_TEST_READ_WRITE
@@ -225,7 +228,26 @@ int main(void)
 		bytes_fed += to_feed;
 	}
 	load_png_image_release();
+#endif
 
+#define READ_WEATHER_DATA
+#ifdef READ_WEATHER_DATA
+	static const char weather_str[128];
+	weather_data_t weather;
+
+	if (bme_driver_get_weather(&weather)) {
+		Error_Handler();
+	}
+	sprintf(weather_str, "Temp: %d.%02d C, Pres: %d mmHg, Hum: %d %%",
+			weather.temperature / 100, weather.temperature % 100,
+			weather.pressure,
+			weather.humidity);
+#ifdef DISPLAY_IMAGE
+	display_add_text(weather_str);
+#endif
+#endif
+
+#ifdef DISPLAY_IMAGE
 	display_png_image();
 	HAL_Delay(100);
 	display_deinit();

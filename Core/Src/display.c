@@ -14,6 +14,7 @@
 #include "EPD_7in5bc.h"
 #include "pngle/pngle.h"
 #include "scale_stream.h"
+#include "text_area/text_area.h"
 
 
 static size_t png_image_width;
@@ -207,4 +208,28 @@ int display_png_image(void)
 	EPD_7IN5BC_Display((const UBYTE *)display_buffer, NULL);
 	printf("Drawing done\r\n");
 	return 0;
+}
+
+static void text_area_draw(void *ctx, size_t x, size_t y, uint8_t v)
+{
+	UNUSED(ctx);
+	display_put_pixel(x, y, v);
+}
+
+int display_add_text(const char *str)
+{
+	text_area_t area;
+	static const size_t font_height = 16;
+	printf("Add \"%s\" to display\r\n", str);
+
+	text_area_init(&area, DISPLAY_WIDTH , font_height + 4);
+	text_area_set_transparent(&area, 1);
+	text_area_setup_draw(&area, text_area_draw, NULL);
+
+	if (text_area_render(&area, str)) {
+		printf("Failed to render text\r\n");
+		return -1;
+	}
+	return 0;
+
 }

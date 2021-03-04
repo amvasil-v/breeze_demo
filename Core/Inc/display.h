@@ -25,6 +25,7 @@ int display_png_image(void);
 int load_png_image_init(void);
 int load_png_image_feed(uint8_t *buf, size_t size);
 int load_png_image_release(void);
+int display_add_text(const char *str);
 
 
 #endif /* INC_DISPLAY_H_ */

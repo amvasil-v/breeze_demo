@@ -19,6 +19,8 @@ extern I2C_HandleTypeDef hi2c1;
 
 extern void DEV_Delay_ms_impl(uint32_t ms);
 
+static struct bme280_dev device;
+
 static void user_delay_us(uint32_t period, void *intf_ptr)
 {
 	/*
@@ -163,8 +165,6 @@ int8_t stream_sensor_data_forced_mode(struct bme280_dev *dev)
 	return rslt;
 }
 
-
-
 void bme_driver_test(void)
 {
 	struct bme280_dev dev;
@@ -183,3 +183,49 @@ void bme_driver_test(void)
 	}
 }
 
+int bme_driver_init(void)
+{
+	if (bme_driver_init_dev(&device)) {
+		printf("Failed to init BME280\r\n");
+		return -1;
+	}
+
+	/* Recommended mode of operation: Indoor navigation */
+	device.settings.osr_h = BME280_OVERSAMPLING_1X;
+	device.settings.osr_p = BME280_OVERSAMPLING_16X;
+	device.settings.osr_t = BME280_OVERSAMPLING_2X;
+	device.settings.filter = BME280_FILTER_COEFF_16;
+
+	uint8_t settings_sel = BME280_OSR_PRESS_SEL | BME280_OSR_TEMP_SEL | BME280_OSR_HUM_SEL | BME280_FILTER_SEL;
+
+	if (bme280_set_sensor_settings(settings_sel, &device)) {
+		printf("Failed to set BME280 settings\r\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+int bme_driver_get_weather(weather_data_t *out)
+{
+	uint32_t req_delay = bme280_cal_meas_delay(&device.settings);
+	struct bme280_data comp_data;
+
+	if (bme280_set_sensor_mode(BME280_FORCED_MODE, &device)) {
+		printf("Failed to set BME280 sensor mode\r\n");
+		return -1;
+	}
+	/* Wait for the measurement to complete and print data @25Hz */
+	device.delay_us(req_delay * 1000, device.intf_ptr);
+	if (bme280_get_sensor_data(BME280_ALL, &comp_data, &device)) {
+		printf("Failed to get BME280 data\r\n");
+		return -1;
+	}
+
+	out->temperature = comp_data.temperature;
+	out->pressure = comp_data.pressure / 133;
+	out->humidity = comp_data.humidity / 1024;
+
+	return 0;
+
+}
