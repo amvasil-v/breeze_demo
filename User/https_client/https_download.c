@@ -19,7 +19,7 @@
 #include "json_parser.h"
 
 static int https_download(HTTP_INFO *hi, netio_t *io, const char *url, ext_storage_t *storage);
-static int https_select_image_url(HTTP_INFO *hi, netio_t *io, char *out, size_t out_size, size_t *img_size);
+static int https_select_image_url(HTTP_INFO *hi, netio_t *io, image_data_t *image_data);
 
 int esp_init(esp_bridge_t *esp)
 {
@@ -68,7 +68,7 @@ int esp_init(esp_bridge_t *esp)
 
 #define HTTPS_IMAGE_URL_BUF_SIZE	256
 
-int https_download_image(ext_storage_t *storage, size_t *image_size)
+int https_download_image(ext_storage_t *storage, image_data_t *image_data)
 {
 	esp_bridge_t esp;
 	HTTP_INFO hi;
@@ -84,18 +84,17 @@ int https_download_image(ext_storage_t *storage, size_t *image_size)
 	http_init(&hi, TRUE, io);
 
 	printf("[HTTPS] Select image URL\r\n");
-	static char image_url[HTTPS_IMAGE_URL_BUF_SIZE];
-	if (https_select_image_url(&hi, io, image_url, HTTPS_IMAGE_URL_BUF_SIZE, image_size)) {
+	if (https_select_image_url(&hi, io, image_data)) {
 		Error_Handler();
 	}
 
-	printf("[HTTPS] Image size %u, prepare storage\r\n", *image_size);
-	if (ext_storage_prepare(storage, image_ext_addr, *image_size)) {
+	printf("[HTTPS] Image size %u, prepare storage\r\n", image_data->size);
+	if (ext_storage_prepare(storage, image_ext_addr, image_data->size)) {
 		Error_Handler();
 	}
 
-	printf("[HTTPS] Download image from %s\r\n", image_url);
-	int ret = https_download(&hi, io, image_url, storage);
+	printf("[HTTPS] Download image from %s\r\n", image_data->url);
+	int ret = https_download(&hi, io, image_data->url, storage);
 	if (!ret)
 		printf("[HTTPS] Download complete\r\n");
 	else {
@@ -185,12 +184,12 @@ static int https_download(HTTP_INFO *hi, netio_t *io, const char *url, ext_stora
 	return 0;
 }
 
-static int https_select_image_url(HTTP_INFO *hi, netio_t *io, char *out, size_t out_size, size_t *img_size)
+
+static int https_select_image_url(HTTP_INFO *hi, netio_t *io, image_data_t *image_data)
 {
 	static const char *main_url = "https://xkcd.com/info.0.json";
 	int content_len = 0;
-	const char *image_url = "";
-	static char tmp[256];
+	static char tmp[IMAGE_URL_SIZE];
 
 	led_set(0, 0);
 	led_set(1, 0);
@@ -234,14 +233,27 @@ static int https_select_image_url(HTTP_INFO *hi, netio_t *io, char *out, size_t 
 			Error_Handler();
 		}
 
-		if (json_parser_get_string(https_buf, "img", tmp, 256)) {
+		if (json_parser_get_string(https_buf, "img", tmp, sizeof(tmp))) {
 			printf("Failed to get img URL from json\r\n");
 			HAL_Delay(500);
 			continue;
 		}
-
-		image_url = tmp;
+		const char *image_url = tmp;
 		printf("Image URL: %s\r\n", image_url);
+		if (strlen(image_url) >= IMAGE_URL_SIZE - 1) {
+			printf("Image URL doesn't fit into buffer\r\n");
+			Error_Handler();
+		}
+		strlcpy(image_data->url, image_url, IMAGE_URL_SIZE);
+
+		if (json_parser_get_string(https_buf, "safe_title", tmp, sizeof(tmp))) {
+			printf("Failed to get img title from json\r\n");
+			HAL_Delay(500);
+			continue;
+		}
+		const char *image_title = tmp;
+		printf("Image title: %s\r\n", image_title);
+		strlcpy(image_data->title, image_title, IMAGE_URL_SIZE);
 
 		io->disconnect(io);
 
@@ -249,7 +261,7 @@ static int https_select_image_url(HTTP_INFO *hi, netio_t *io, char *out, size_t 
 		led_set(1, 0);
 		HAL_Delay(200);
 		printf("Get image HTTPS header\r\n");
-		ret = http_get_header(hi, (char *)image_url, https_buf, sizeof(https_buf), io);
+		ret = http_get_header(hi, image_data->url, https_buf, sizeof(https_buf), io);
 		printf("return code: %d \r\n", ret);
 		if (ret != 200)
 		{
@@ -271,12 +283,6 @@ static int https_select_image_url(HTTP_INFO *hi, netio_t *io, char *out, size_t 
 		}
 	}
 
-	if (strlen(image_url) >= out_size - 1) {
-		printf("Image URL doesn't fit into buffer\r\n");
-		Error_Handler();
-	}
-
-	*img_size = content_len;
-	strncpy(out, image_url, out_size);
+	image_data->size = content_len;
 	return 0;
 }

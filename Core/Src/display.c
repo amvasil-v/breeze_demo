@@ -29,7 +29,11 @@ static int draw_curr_row = 0;
 int display_init(void)
 {
 	printf("Display init\r\n");
+	DEV_Module_Exit();
+	DEV_Delay_ms(1000);
 	DEV_Module_Init();
+	DEV_Delay_ms(2000);
+
 	EPD_7IN5BC_Init();
 	EPD_7IN5BC_Clear();
 	DEV_Delay_ms(100);

@@ -29,6 +29,8 @@
 #include "ext_storage.h"
 #include "https_download.h"
 #include "bme_driver.h"
+#include "image_data.h"
+#include "sys_control.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +58,8 @@ QSPI_HandleTypeDef hqspi;
 
 SPI_HandleTypeDef hspi2;
 
+TIM_HandleTypeDef htim11;
+
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart6;
 DMA_HandleTypeDef hdma_usart1_rx;
@@ -75,6 +79,7 @@ static void MX_SPI2_Init(void);
 static void MX_QUADSPI_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM11_Init(void);
 /* USER CODE BEGIN PFP */
 static void qspi_test(void);
 /* USER CODE END PFP */
@@ -163,12 +168,18 @@ int main(void)
 	MX_QUADSPI_Init();
 	MX_USART1_UART_Init();
 	MX_I2C1_Init();
+	MX_TIM11_Init();
 	/* USER CODE BEGIN 2 */
 
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
+
+#define DISPLAY_IMAGE
+#define READ_WEATHER_DATA
+#define DOWNLOAD_IMAGE
+
 	HAL_Delay(400);
 	printf("App started\r\n");
 	HAL_Delay(100);
@@ -179,10 +190,17 @@ int main(void)
 		Error_Handler();
 	}
 
+	led_set(1, 1);
 	esp_reset(1);
 	HAL_Delay(200);
 	esp_reset(0);
+	led_set(1, 0);
+
+#ifdef DISPLAY_IMAGE
 	display_init();
+#else
+	HAL_Delay(1000);
+#endif
 
 
 
@@ -190,31 +208,28 @@ int main(void)
 	esp_test_read_write();
 #endif
 
+#ifdef DOWNLOAD_IMAGE
 	ext_storage_t ext;
-	size_t png_image_size;
+	static image_data_t image_data;
 	if (ext_storage_init(&ext)) {
 		Error_Handler();
 	}
 
-	if (https_download_image(&ext, &png_image_size)) {
+	if (https_download_image(&ext, &image_data)) {
 		printf("Failed to download image\r\n");
 		Error_Handler();
 	}
+	printf("Image with size %u saved to QSPI flash\r\n", image_data.size);
+#endif
 
-	printf("Image with size %u saved to QSPI flash\r\n", png_image_size);
-
-	/*ext_storage_test_read_write();*/
-
-
-#define DISPLAY_IMAGE
 #ifdef DISPLAY_IMAGE
 	led_set(1, 1);
 	load_png_image_init();
 	size_t bytes_fed = 0;
 	const size_t feed_chunk = 256;
 	static uint8_t qspi_read_buf[256];
-	while (bytes_fed < png_image_size) {
-		size_t to_feed = png_image_size - bytes_fed;
+	while (bytes_fed < image_data.size) {
+		size_t to_feed = image_data.size - bytes_fed;
 		if (to_feed > feed_chunk) {
 			to_feed = feed_chunk;
 		}
@@ -223,6 +238,8 @@ int main(void)
 		}
 		if (load_png_image_feed(qspi_read_buf, to_feed)) {
 			printf("Feed failed at %u\r\n", bytes_fed);
+			display_deinit();
+			HAL_Delay(1000);
 			Error_Handler();
 		}
 		bytes_fed += to_feed;
@@ -230,15 +247,17 @@ int main(void)
 	load_png_image_release();
 #endif
 
-#define READ_WEATHER_DATA
+
 #ifdef READ_WEATHER_DATA
-	static const char weather_str[128];
+	static char weather_str[256];
 	weather_data_t weather;
 
 	if (bme_driver_get_weather(&weather)) {
 		Error_Handler();
 	}
-	sprintf(weather_str, "Temp: %d.%02d C, Pres: %d mmHg, Hum: %d %%",
+	snprintf(weather_str, sizeof(weather_str),
+			"xkcd.com: %s  | T:%d.%02dC,P:%dmmHg,H:%d%%",
+			image_data.title,
 			weather.temperature / 100, weather.temperature % 100,
 			weather.pressure,
 			weather.humidity);
@@ -253,14 +272,25 @@ int main(void)
 	display_deinit();
 #endif
 
+	led_set(0, 0);
+	led_set(1, 0);
+
+	static const int wait_sec = 60 * 2;
+	static const int wait_period = 5;
+
+	if (wait_sec) {
+		system_wait_and_reset(wait_sec, wait_period);
+	}
+
 	while (1)
 	{
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-		HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		HAL_Delay(400);
-
+		led_set(1, 1);
+		HAL_Delay(100);
+		led_set(1, 0);
+		HAL_Delay(1000);
 	}
 	/* USER CODE END 3 */
 }
@@ -419,6 +449,37 @@ static void MX_SPI2_Init(void)
 	/* USER CODE BEGIN SPI2_Init 2 */
 
 	/* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
+ * @brief TIM11 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_TIM11_Init(void)
+{
+
+	/* USER CODE BEGIN TIM11_Init 0 */
+
+	/* USER CODE END TIM11_Init 0 */
+
+	/* USER CODE BEGIN TIM11_Init 1 */
+
+	/* USER CODE END TIM11_Init 1 */
+	htim11.Instance = TIM11;
+	htim11.Init.Prescaler = 49999;
+	htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim11.Init.Period = 17999;
+	htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+	if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN TIM11_Init 2 */
+
+	/* USER CODE END TIM11_Init 2 */
 
 }
 
@@ -634,7 +695,7 @@ void DEV_Delay_ms_impl(uint32_t ms)
 	} else {
 		uint32_t delay = 0;
 		while (delay < ms) {
-			uint32_t wait = ms - delay > min_delay ? ms - delay : min_delay;
+			uint32_t wait = ms - delay > min_delay ? min_delay : ms - delay;
 			led_blink(1);
 			HAL_Delay(wait);
 			delay += wait;
@@ -651,15 +712,7 @@ void Error_Handler(void)
 {
 	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
-	HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, LED_GPIO_ON);
-	HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, LED_GPIO_ON);
-	while (1) {
-		HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
-		HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		for (int i = 0; i < 1000000; i++) {
-			__NOP();
-		}
-	}
+	system_error_handler();
 	/* USER CODE END Error_Handler_Debug */
 }
 
