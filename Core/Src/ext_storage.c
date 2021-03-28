@@ -12,6 +12,7 @@
 
 #include "main.h"
 #include "qspi_driver.h"
+#include "image_hash.h"
 
 int ext_storage_init(ext_storage_t *ext)
 {
@@ -179,4 +180,25 @@ int ext_storage_test_read_write(void)
 	printf("Pattern verified\r\n");
 	return 0;
 
+}
+
+int ext_storage_read_and_hash(ext_storage_t *ext, uint8_t *buf, size_t size)
+{
+	size_t bytes_read = 0;
+
+	while(bytes_read < ext->stored_size) {
+		size_t to_read = ext->stored_size - bytes_read;
+		if (to_read > size) {
+			to_read = size;
+		}
+		if (ext_storage_read(ext, buf, to_read, ext->start_address + bytes_read)) {
+			return -1;
+		}
+		image_hash_feed(buf, to_read);
+		bytes_read += to_read;
+	}
+
+	image_hash_finalize(1);
+
+	return 0;
 }

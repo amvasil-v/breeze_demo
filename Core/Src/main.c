@@ -32,6 +32,7 @@
 #include "image_data.h"
 #include "sys_control.h"
 #include "entropy.h"
+#include "image_hash.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -142,6 +143,7 @@ int main(void)
 #define DISPLAY_IMAGE
 #define READ_WEATHER_DATA
 #define DOWNLOAD_IMAGE
+#define VERIFY_IMAGE
 
 	HAL_Delay(400);
 	printf("App started\r\n");
@@ -181,6 +183,7 @@ int main(void)
 	if (ext_storage_init(&ext)) {
 		Error_Handler();
 	}
+	image_hash_init();
 
 	if (https_download_image(&ext, &image_data)) {
 		printf("Failed to download image\r\n");
@@ -189,12 +192,27 @@ int main(void)
 	printf("Image with size %u saved to QSPI flash\r\n", image_data.size);
 #endif
 
+	static uint8_t qspi_read_buf[256];
+
+#ifdef VERIFY_IMAGE
+	printf("Verifying image hash\r\n");
+	ext_storage_read_and_hash(&ext, qspi_read_buf, 256);
+	if (image_hash_equal()) {
+		printf("Image hash verified\r\n");
+		image_hash_release();
+	} else {
+		printf("Image hash verify failed\r\n");
+		Error_Handler();
+	}
+#endif
+
 #ifdef DISPLAY_IMAGE
+	display_clear();
+	HAL_Delay(100);
 	led_set(1, 1);
 	load_png_image_init();
 	size_t bytes_fed = 0;
 	const size_t feed_chunk = 256;
-	static uint8_t qspi_read_buf[256];
 	while (bytes_fed < image_data.size) {
 		size_t to_feed = image_data.size - bytes_fed;
 		if (to_feed > feed_chunk) {

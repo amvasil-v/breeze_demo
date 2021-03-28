@@ -23,5 +23,6 @@ int ext_storage_prepare(ext_storage_t *ext, uint32_t store_addr, size_t size);
 int ext_storage_write(ext_storage_t *ext, uint8_t *buf, size_t len);
 int ext_storage_read(ext_storage_t *ext, uint8_t *buf, size_t len, uint32_t src_addr);
 int ext_storage_test_read_write();
+int ext_storage_read_and_hash(ext_storage_t *ext, uint8_t *buf, size_t size);
 
 #endif /* INC_EXT_STORAGE_H_ */

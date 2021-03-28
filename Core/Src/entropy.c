@@ -20,7 +20,7 @@ extern ADC_HandleTypeDef hadc1;
 static mbedtls_entropy_context entropy;
 static mbedtls_ctr_drbg_context ctr_drbg;
 
-#define SYS_ENTROPY_PRINT
+//#define SYS_ENTROPY_PRINT
 
 uint32_t entropy_get_hw_random(void)
 {

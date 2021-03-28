@@ -91,7 +91,7 @@ void system_go_standby(uint8_t min_bcd, uint8_t sec_bcd)
 		Error_Handler();
 	}
 
-	printf("Waiting for RTC alarm in %u:%u\r\n", min_bcd, sec_bcd);
+	printf("Waiting for RTC alarm in %02x:%02x\r\n", min_bcd, sec_bcd);
 	HAL_PWR_EnterSTANDBYMode();
 
 	HAL_NVIC_SystemReset();

@@ -18,6 +18,7 @@
 #include "esp_utils.h"
 #include "json_parser.h"
 #include "entropy.h"
+#include "image_hash.h"
 
 static int https_download(HTTP_INFO *hi, netio_t *io, const char *url, ext_storage_t *storage);
 static int https_select_image_url(HTTP_INFO *hi, netio_t *io, image_data_t *image_data);
@@ -177,10 +178,13 @@ static int https_download(HTTP_INFO *hi, netio_t *io, const char *url, ext_stora
 			printf("Failed to save to ext storage\r\n");
 			return -1;
 		}
+		image_hash_feed((uint8_t *)https_buf, write_len);
 #endif
 
 		pos = range_end + 1;
 	}
+
+	image_hash_finalize(0);
 
 	return 0;
 }

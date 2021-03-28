@@ -35,7 +35,9 @@ int display_init(void)
 	DEV_Delay_ms(2000);
 
 	EPD_7IN5BC_Init();
+#ifdef DISPLAY_INIT_CLEAR
 	EPD_7IN5BC_Clear();
+#endif
 	DEV_Delay_ms(100);
 	printf("Display init done\r\n");
 	return 0;
