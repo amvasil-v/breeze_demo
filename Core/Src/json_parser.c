@@ -15,7 +15,7 @@ int json_parser_get_number(const char *json, const char *field, int *out)
         const char *error_ptr = cJSON_GetErrorPtr();
         if (error_ptr != NULL)
         {
-            printf(stderr, "Error before: %s\n", error_ptr);
+            printf("Error before: %s\n", error_ptr);
         }
         cJSON_Delete(json_obj);
         return -1;
@@ -41,7 +41,7 @@ int json_parser_get_string(const char *json, const char *field, char *out, size_
         const char *error_ptr = cJSON_GetErrorPtr();
         if (error_ptr != NULL)
         {
-            printf(stderr, "Error before: %s\n", error_ptr);
+            printf("Error before: %s\n", error_ptr);
         }
         cJSON_Delete(json_obj);
         return -1;

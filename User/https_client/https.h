@@ -46,8 +46,6 @@ typedef struct
     BOOL    verify;
 
     //mbedtls_net_context         ssl_fd;
-    mbedtls_entropy_context     entropy;
-    mbedtls_ctr_drbg_context    ctr_drbg;
     mbedtls_ssl_context         ssl;
     mbedtls_ssl_config          conf;
     mbedtls_x509_crt            cacert;

@@ -9,6 +9,7 @@
 
 #include "ca_cert.h"
 #include "https.h"
+#include "entropy.h"
 
 /*---------------------------------------------------------------------*/
 static int _error;
@@ -459,7 +460,6 @@ static int https_init(HTTP_INFO *hi, BOOL https, BOOL verify, netio_t *io)
         mbedtls_ssl_init( &hi->tls.ssl );
         mbedtls_ssl_config_init( &hi->tls.conf );
         mbedtls_x509_crt_init( &hi->tls.cacert );
-        mbedtls_ctr_drbg_init( &hi->tls.ctr_drbg );
     }
 
     hi->tls.io = io;
@@ -490,8 +490,6 @@ static int https_close(HTTP_INFO *hi)
         mbedtls_x509_crt_free(&hi->tls.cacert);
         mbedtls_ssl_free(&hi->tls.ssl);
         mbedtls_ssl_config_free(&hi->tls.conf);
-        mbedtls_ctr_drbg_free(&hi->tls.ctr_drbg);
-        mbedtls_entropy_free(&hi->tls.entropy);
     }
 
 //  printf("https_close ... \n");
@@ -510,15 +508,6 @@ static int https_connect(HTTP_INFO *hi, char *host, char *port)
     if(https == 1)
     {
         //printf("Start mbedtls configure\n");
-        mbedtls_entropy_init( &hi->tls.entropy );
-
-        ret = mbedtls_ctr_drbg_seed( &hi->tls.ctr_drbg, mbedtls_entropy_func, &hi->tls.entropy, NULL, 0);
-        if( ret != 0 )
-        {
-            return ret;
-        }
-
-       // printf("Done mbedtls drbg_seed\n");
 
         ret = mbedtls_x509_crt_parse(&hi->tls.cacert, (uint8_t *)ca_cert_globalsign, strlen(ca_cert_globalsign) + 1);
         if( ret != 0 )
@@ -542,7 +531,7 @@ static int https_connect(HTTP_INFO *hi, char *host, char *port)
          * but makes interop easier in this simplified example */
         mbedtls_ssl_conf_authmode( &hi->tls.conf, MBEDTLS_SSL_VERIFY_NONE );
         mbedtls_ssl_conf_ca_chain( &hi->tls.conf, &hi->tls.cacert, NULL );
-        mbedtls_ssl_conf_rng( &hi->tls.conf, mbedtls_ctr_drbg_random, &hi->tls.ctr_drbg );
+        mbedtls_ssl_conf_rng( &hi->tls.conf, mbedtls_ctr_drbg_random, entropy_get_ctr_drbg_context() );
         mbedtls_ssl_conf_read_timeout( &hi->tls.conf, 5000 );
 
         ret = mbedtls_ssl_setup( &hi->tls.ssl, &hi->tls.conf );

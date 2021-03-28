@@ -17,6 +17,7 @@
 #include "netio_esp.h"
 #include "esp_utils.h"
 #include "json_parser.h"
+#include "entropy.h"
 
 static int https_download(HTTP_INFO *hi, netio_t *io, const char *url, ext_storage_t *storage);
 static int https_select_image_url(HTTP_INFO *hi, netio_t *io, image_data_t *image_data);
@@ -218,7 +219,7 @@ static int https_select_image_url(HTTP_INFO *hi, netio_t *io, image_data_t *imag
 
 	srand(HAL_GetTick());
 	while (1) {
-		int selected = rand() % num_comics + 1;
+		int selected = entropy_random() % num_comics + 1;
 		printf("Selected: %d\r\n", selected);
 
 		sprintf(tmp, "https://xkcd.com/%d/info.0.json", selected);
