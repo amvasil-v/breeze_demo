@@ -14,6 +14,7 @@
 
 extern TIM_HandleTypeDef htim11;
 extern UART_HandleTypeDef huart1;
+extern RTC_HandleTypeDef hrtc;
 
 void system_error_handler (void)
 {
@@ -62,6 +63,37 @@ void system_wait_and_reset(uint32_t wait, uint32_t period)
 
 	printf("System reset\r\n");
 	HAL_Delay(300);
+	HAL_NVIC_SystemReset();
+}
+
+void system_go_standby(uint8_t min_bcd, uint8_t sec_bcd)
+{
+	HAL_RTC_DeactivateAlarm(&hrtc, RTC_ALARM_A);
+
+	RTC_AlarmTypeDef sAlarm = {0};
+
+	sAlarm.AlarmTime.Hours = 0x0;
+	sAlarm.AlarmTime.Minutes = min_bcd;
+	sAlarm.AlarmTime.Seconds = sec_bcd;
+	sAlarm.AlarmTime.SubSeconds = 0x0;
+	sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+	sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
+	sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS;
+	if (!min_bcd) {
+		sAlarm.AlarmMask |= RTC_ALARMMASK_MINUTES;
+	}
+	sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
+	sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
+	sAlarm.AlarmDateWeekDay = 0x1;
+	sAlarm.Alarm = RTC_ALARM_A;
+	if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BCD) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	printf("Waiting for RTC alarm in %u:%u\r\n", min_bcd, sec_bcd);
+	HAL_PWR_EnterSTANDBYMode();
+
 	HAL_NVIC_SystemReset();
 }
 

@@ -13,5 +13,6 @@
 
 void system_error_handler(void);
 void system_wait_and_reset(uint32_t wait, uint32_t period);
+void system_go_standby(uint8_t min_bcd, uint8_t sec_bcd);
 
 #endif /* INC_SYS_CONTROL_H_ */
